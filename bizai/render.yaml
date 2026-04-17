@@ -1,38 +1,46 @@
-# ─── render.yaml ─────────────────────────────────────────────────────────────
-# Render Blueprint — deploys BizAI as a single Web Service.
-# The Express server handles both the REST API (/api/*) and serves the
-# pre-built React frontend (client/dist) for all other routes.
-#
-# Push this file to the root of your Git repository, then on Render:
-#   Dashboard → New → Blueprint → connect your repo → Deploy
-# ─────────────────────────────────────────────────────────────────────────────
-
 services:
+  # ── 1. Backend — Express API (Web Service) ────────────────────────────────
   - type: web
-    name: bizai
+    name: bizai-backend
     runtime: node
-    region: singapore          # closest to India; change to oregon / frankfurt as needed
+    region: singapore
 
-    # Render will cd into the repo root, run buildCommand, then startCommand
-    buildCommand: |
-      cd client && npm install && npm run build
-      cd ../server && npm install
-
-    startCommand: node server/index.js
+    buildCommand: cd bizai/server && npm install
+    startCommand: node bizai/server/index.js
 
     envVars:
       - key: NODE_ENV
         value: production
-
-      # ── Add these in the Render Dashboard → Environment section ──────────
-      # (never commit real values to git)
+      - key: PORT
+        value: 10000
+      # Paste these values in Render dashboard → Environment:
       - key: MONGODB_URI
-        sync: false           # you paste the value in the dashboard
-
+        sync: false
       - key: JWT_SECRET
         sync: false
-
       - key: GROQ_API_KEY
         sync: false
+      # After Static Site deploys, paste its URL here (for CORS):
+      - key: CLIENT_URL
+        sync: false
 
-      # Render assigns PORT automatically — no need to set it manually
+  # ── 2. Frontend — React app (Static Site) ────────────────────────────────
+  - type: web
+    name: bizai-frontend
+    runtime: static
+    region: singapore
+
+    buildCommand: cd bizai/client && npm install && npm run build
+    staticPublishPath: bizai/client/dist
+
+    envVars:
+      # Paste the bizai-backend Web Service URL here BEFORE deploying frontend:
+      # e.g. https://bizai-backend.onrender.com/api
+      - key: VITE_API_URL
+        sync: false
+
+    routes:
+      # Send all routes to index.html so React Router works
+      - type: rewrite
+        source: /*
+        destination: /index.html

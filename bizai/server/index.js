@@ -9,14 +9,21 @@ const isProd = process.env.NODE_ENV === 'production';
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 const allowedOrigins = isProd
-  ? [process.env.CLIENT_URL].filter(Boolean)           // e.g. https://yourdomain.com
+  ? [
+      process.env.CLIENT_URL,                     // your exact frontend URL
+      /\.onrender\.com$/,                          // any *.onrender.com (covers Render previews)
+    ].filter(Boolean)
   : ['http://localhost:5173', 'http://127.0.0.1:5173',
      'http://localhost:5174', 'http://127.0.0.1:5174',
      'http://localhost:5175', 'http://127.0.0.1:5175'];
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    if (!origin) return cb(null, true); // allow non-browser (Postman, curl)
+    const allowed = allowedOrigins.some(o =>
+      typeof o === 'string' ? o === origin : o.test(origin)
+    );
+    if (allowed) return cb(null, true);
     cb(new Error('Not allowed by CORS'));
   },
   credentials: true,
