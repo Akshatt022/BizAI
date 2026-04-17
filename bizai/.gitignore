@@ -1,0 +1,29 @@
+# ── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+
+# ── Build output ─────────────────────────────────────────────────────────────
+client/dist/
+client/build/
+
+# ── Environment variables (NEVER commit these) ────────────────────────────────
+.env
+.env.local
+.env.*.local
+server/.env
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+
+# ── OS / Editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+.idea/
+
+# ── Vite cache ────────────────────────────────────────────────────────────────
+.vite/
+client/.vite/

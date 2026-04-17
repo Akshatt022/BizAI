@@ -1,0 +1,38 @@
+# ─── render.yaml ─────────────────────────────────────────────────────────────
+# Render Blueprint — deploys BizAI as a single Web Service.
+# The Express server handles both the REST API (/api/*) and serves the
+# pre-built React frontend (client/dist) for all other routes.
+#
+# Push this file to the root of your Git repository, then on Render:
+#   Dashboard → New → Blueprint → connect your repo → Deploy
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  - type: web
+    name: bizai
+    runtime: node
+    region: singapore          # closest to India; change to oregon / frankfurt as needed
+
+    # Render will cd into the repo root, run buildCommand, then startCommand
+    buildCommand: |
+      cd client && npm install && npm run build
+      cd ../server && npm install
+
+    startCommand: node server/index.js
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # ── Add these in the Render Dashboard → Environment section ──────────
+      # (never commit real values to git)
+      - key: MONGODB_URI
+        sync: false           # you paste the value in the dashboard
+
+      - key: JWT_SECRET
+        sync: false
+
+      - key: GROQ_API_KEY
+        sync: false
+
+      # Render assigns PORT automatically — no need to set it manually
