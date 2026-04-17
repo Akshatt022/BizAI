@@ -3,8 +3,8 @@ node_modules/
 .pnp
 .pnp.js
 
-# ── Build output ─────────────────────────────────────────────────────────────
-client/dist/
+## Build output (keep client/dist — committed for Render deployment)
+## client/dist/
 client/build/
 
 # ── Environment variables (NEVER commit these) ────────────────────────────────
