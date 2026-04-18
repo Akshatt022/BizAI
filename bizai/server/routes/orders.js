@@ -15,7 +15,9 @@ router.get('/', auth, async (req, res) => {
     const orders = await Order.find({ shopId: sellerId })
       .sort({ createdAt: -1 })
       .limit(100);
-    res.json({ success: true, data: orders });
+    // Temporary debug — remove after issue is resolved
+    console.log(`GET /orders: user=${req.user.id} role=${req.user.role} found=${orders.length}`);
+    res.json({ success: true, data: orders, _debug: { queriedFor: req.user.id, found: orders.length } });
   } catch (err) {
     console.error('GET /orders error:', err.message);
     res.status(500).json({ success: false, message: err.message });
