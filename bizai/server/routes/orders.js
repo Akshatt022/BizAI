@@ -40,20 +40,35 @@ router.get('/mine', auth, async (req, res) => {
 // ── GET /api/orders/debug — diagnostic, no auth needed (remove after debugging)
 router.get('/debug', async (req, res) => {
   try {
+    const DEMO_SHOP_ID = '69e2207897c30d6c1023201f';
+
+    // Test 1: raw count without any filter
     const totalOrders = await Order.countDocuments({});
-    const last20 = await Order.find({})
-      .sort({ createdAt: -1 })
-      .limit(20)
-      .select('shopId consumerId consumerName status total createdAt notes');
+
+    // Test 2: filter by shopId as STRING (no cast)
+    const byString = await Order.find({ shopId: DEMO_SHOP_ID }).limit(5);
+
+    // Test 3: filter by shopId as ObjectId (our current approach)
+    const byObjectId = await Order.find({ shopId: toId(DEMO_SHOP_ID) }).limit(5);
+
+    // Test 4: use the lean approach
+    const byLean = await Order.find({ shopId: DEMO_SHOP_ID }).lean().limit(5);
+
     res.json({
       totalOrdersInDB: totalOrders,
-      last20Orders: last20,
-      message: totalOrders === 0
-        ? 'No orders in DB at all — order placement is failing'
-        : 'Orders exist — check shopId vs your seller userId',
+      queryByString_count:   byString.length,
+      queryByObjectId_count: byObjectId.length,
+      queryByLean_count:     byLean.length,
+      firstOrderShopIdType:  byLean[0] ? typeof byLean[0].shopId : 'no orders',
+      firstOrderShopIdValue: byLean[0]?.shopId,
+      message: byObjectId.length > 0
+        ? '✅ ObjectId query works — frontend issue'
+        : byString.length > 0
+          ? '⚠️ String query works but ObjectId does not — type stored as string in DB'
+          : '❌ No results either way — something else is wrong',
     });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: err.message, stack: err.stack });
   }
 });
 
