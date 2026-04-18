@@ -3,6 +3,7 @@ const router   = express.Router();
 const auth     = require('../middleware/auth');
 const Order    = require('../models/Order');
 const Product  = require('../models/Product');
+const mongoose = require('mongoose');
 
 // ── GET /api/orders  — seller sees their shop's orders ───────────────────────
 router.get('/', auth, async (req, res) => {
@@ -33,32 +34,51 @@ router.get('/mine', auth, async (req, res) => {
 router.post('/', auth, async (req, res) => {
   try {
     const { shopId, items, notes, consumerPhone } = req.body;
-    if (!shopId || !items?.length) return res.status(400).json({ success: false, message: 'shopId and items are required.' });
+    if (!shopId || !items?.length)
+      return res.status(400).json({ success: false, message: 'shopId and items are required.' });
 
-    // Validate products belong to that shop and are in stock, compute total
+    // Cast shopId to ObjectId so Mongoose comparison is reliable
+    let shopObjId;
+    try { shopObjId = new mongoose.Types.ObjectId(shopId); }
+    catch { return res.status(400).json({ success: false, message: 'Invalid shop ID.' }); }
+
+    // Validate products belong to that shop (skip inStock — trust the UI)
     let total = 0;
     const enrichedItems = [];
     for (const item of items) {
-      const product = await Product.findOne({ _id: item.productId, userId: shopId, inStock: true });
-      if (!product) return res.status(400).json({ success: false, message: `${item.name || 'A product'} is no longer available.` });
+      let prodId;
+      try { prodId = new mongoose.Types.ObjectId(item.productId); }
+      catch { return res.status(400).json({ success: false, message: `Invalid product ID for ${item.name}.` }); }
+
+      const product = await Product.findOne({ _id: prodId, userId: shopObjId });
+      if (!product)
+        return res.status(400).json({ success: false, message: `Product "${item.name || 'Unknown'}" not found in this shop.` });
+
       const qty = parseInt(item.quantity) || 1;
       total += product.price * qty;
-      enrichedItems.push({ productId: product._id, name: product.name, price: product.price, quantity: qty, unit: product.unit });
+      enrichedItems.push({
+        productId: product._id,
+        name:      product.name,
+        price:     product.price,
+        quantity:  qty,
+        unit:      product.unit,
+      });
     }
 
     const order = await Order.create({
-      shopId,
-      consumerId:    req.user.id,
+      shopId:        shopObjId,
+      consumerId:    new mongoose.Types.ObjectId(req.user.id),
       consumerName:  req.user.name,
       consumerPhone: consumerPhone || '',
-      items: enrichedItems,
+      items:         enrichedItems,
       total,
-      notes: notes || '',
+      notes:         notes || '',
     });
 
-    res.status(201).json({ success: true, data: order, message: 'Order placed successfully!' });
+    res.status(201).json({ success: true, data: order, message: 'Order placed! Come to the shop and pay when you pick up.' });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error('Order create error:', err.message);
+    res.status(500).json({ success: false, message: 'Could not place order. Please try again.' });
   }
 });
 

@@ -48,14 +48,14 @@ export default function Layout() {
     return () => { document.body.style.overflow = ''; };
   }, [mobileOpen]);
 
-  // Poll for pending orders every 30s
+  // Poll for pending orders every 8s so the red badge appears quickly
   useEffect(() => {
     const check = () => API.get('/orders').then(({ data }) => {
       const count = (data.data || []).filter(o => o.status === 'pending').length;
       setPendingOrders(count);
     }).catch(() => {});
     check();
-    const id = setInterval(check, 30000);
+    const id = setInterval(check, 8000);
     return () => clearInterval(id);
   }, []);
 

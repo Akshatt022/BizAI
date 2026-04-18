@@ -25,7 +25,7 @@ export default function Orders() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); const id = setInterval(load, 20000); return () => clearInterval(id); }, [load]);
+  useEffect(() => { load(); const id = setInterval(load, 8000); return () => clearInterval(id); }, [load]);
 
   const updateStatus = async (order) => {
     const next = NEXT_STATUS[order.status];
@@ -61,7 +61,7 @@ export default function Orders() {
         <div>
           <h2 style={{ fontWeight:800, fontSize:22, marginBottom:4 }}>🛒 Incoming Orders</h2>
           <p style={{ color:'var(--txt-2)', fontSize:13 }}>
-            {pendingCount > 0 ? <span style={{ color:'#F59E0B', fontWeight:700 }}> ⚠️ {pendingCount} pending orders need attention</span> : 'All caught up!'} · Auto-refreshes every 20s
+            {pendingCount > 0 ? <span style={{ color:'#F59E0B', fontWeight:700 }}> ⚠️ {pendingCount} pending orders need attention</span> : 'All caught up!'} · Auto-refreshes every 8s
           </p>
         </div>
         <button onClick={load} style={{ padding:'9px 18px', borderRadius:11, background:'rgba(99,102,241,.1)', border:'1px solid rgba(99,102,241,.25)', color:'#a5b4fc', fontWeight:600, fontSize:13, cursor:'pointer' }}>🔄 Refresh</button>

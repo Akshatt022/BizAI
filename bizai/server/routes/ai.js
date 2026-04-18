@@ -229,13 +229,32 @@ router.post('/forecast', async (req, res) => {
   try {
     const { weeklyData = [] } = req.body;
 
-    const prompt = `Weekly sales data for the last 7 days (each has day name and total revenue in INR):
+    const avgRevenue = weeklyData.length
+      ? Math.round(weeklyData.reduce((s, d) => s + (d.total || 0), 0) / weeklyData.length)
+      : 1000;
+
+    const trend = weeklyData.length >= 2
+      ? weeklyData[weeklyData.length - 1].total - weeklyData[0].total
+      : 0;
+
+    const prompt = `You are a revenue forecasting AI. A local shop had these daily revenues last week:
 ${weeklyData.map(d => `${d.day}: ₹${d.total}`).join('\n')}
 
-Based on this trend, predict the next 7 days of revenue. Consider weekday/weekend patterns.
-Respond as JSON: {"forecast": [{"day": "Mon", "predicted": 1500, "confidence": "high|medium|low"}]}`;
+Average daily revenue: ₹${avgRevenue}
+Weekly trend: ${trend >= 0 ? '+' : ''}₹${trend} (${trend >= 0 ? 'growing' : 'declining'})
 
-    const FORECAST_SYSTEM = `You are a data analyst AI. Always respond with ONLY valid JSON. No other text.`;
+Predict the NEXT 7 days of revenue (the coming week, NOT the same days again).
+Rules:
+- Weekend days (Sat, Sun) should be 20-40% HIGHER than weekdays
+- Apply the observed trend to next week's values
+- Values must be DIFFERENT from last week (not a copy!)
+- Vary each day realistically (±10-25% from the trend line)
+- Average of predictions should be ${trend >= 0 ? 'higher' : 'similar or lower'} than ₹${avgRevenue}
+
+Respond ONLY as JSON: {"forecast": [{"day": "Mon", "predicted": 1800, "confidence": "high|medium|low"}]}
+Include exactly 7 entries for Mon through Sun.`;
+
+    const FORECAST_SYSTEM = `You are a revenue forecasting AI. Always respond with ONLY valid JSON. No markdown, no text before or after the JSON.`;
 
     const result = await callGroq(FORECAST_SYSTEM, prompt);
     const forecast = Array.isArray(result) ? result : (result.forecast || []);
@@ -243,11 +262,21 @@ Respond as JSON: {"forecast": [{"day": "Mon", "predicted": 1500, "confidence": "
     res.json({ success: true, data: forecast });
   } catch (err) {
     console.error('Forecast error:', err.message);
-    // Simple rule-based forecast as fallback
+    // Rule-based fallback — applies a realistic trend with weekend boost
+    const { weeklyData = [] } = req.body;
+    const avg = weeklyData.length
+      ? weeklyData.reduce((s, d) => s + (d.total || 0), 0) / weeklyData.length
+      : 1000;
+    const trendFactor = weeklyData.length >= 2
+      ? (weeklyData[weeklyData.length - 1].total / Math.max(weeklyData[0].total, 1))
+      : 1.05; // assume 5% growth if no data
     const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-    const fallback = days.map((day, i) => ({
-      day, predicted: 800 + Math.floor(Math.random() * 1200), confidence: 'medium',
-    }));
+    const weekendBoost = { Sat: 1.4, Sun: 1.3 };
+    const fallback = days.map((day) => {
+      const base = avg * trendFactor * (weekendBoost[day] || 1);
+      const variance = 0.85 + Math.random() * 0.3; // ±15%
+      return { day, predicted: Math.round(base * variance), confidence: 'medium' };
+    });
     res.json({ success: true, data: fallback, fallback: true });
   }
 });
