@@ -37,21 +37,20 @@ router.get('/mine', auth, async (req, res) => {
   }
 });
 
-// ── GET /api/orders/debug — shows last 20 orders (any user) for debugging ────
-// Remove this route after confirming orders work correctly in production
-router.get('/debug', auth, async (req, res) => {
+// ── GET /api/orders/debug — diagnostic, no auth needed (remove after debugging)
+router.get('/debug', async (req, res) => {
   try {
-    const orders = await Order.find({})
+    const totalOrders = await Order.countDocuments({});
+    const last20 = await Order.find({})
       .sort({ createdAt: -1 })
       .limit(20)
-      .select('shopId consumerId consumerName status total createdAt');
+      .select('shopId consumerId consumerName status total createdAt notes');
     res.json({
-      success: true,
-      yourUserId: req.user.id,
-      yourRole: req.user.role,
-      totalOrdersInDB: await Order.countDocuments({}),
-      ordersForYourShop: await Order.countDocuments({ shopId: toId(req.user.id) }),
-      last20Orders: orders,
+      totalOrdersInDB: totalOrders,
+      last20Orders: last20,
+      message: totalOrders === 0
+        ? 'No orders in DB at all — order placement is failing'
+        : 'Orders exist — check shopId vs your seller userId',
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
