@@ -5,14 +5,19 @@ const Order    = require('../models/Order');
 const Product  = require('../models/Product');
 const mongoose = require('mongoose');
 
+// Helper: safely cast string to ObjectId
+const toId = (str) => new mongoose.Types.ObjectId(str);
+
 // ── GET /api/orders  — seller sees their shop's orders ───────────────────────
 router.get('/', auth, async (req, res) => {
   try {
-    const orders = await Order.find({ shopId: req.user.id })
+    const sellerId = toId(req.user.id);
+    const orders = await Order.find({ shopId: sellerId })
       .sort({ createdAt: -1 })
       .limit(100);
     res.json({ success: true, data: orders });
   } catch (err) {
+    console.error('GET /orders error:', err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -20,11 +25,34 @@ router.get('/', auth, async (req, res) => {
 // ── GET /api/orders/mine  — consumer sees their own orders ───────────────────
 router.get('/mine', auth, async (req, res) => {
   try {
-    const orders = await Order.find({ consumerId: req.user.id })
+    const consumerId = toId(req.user.id);
+    const orders = await Order.find({ consumerId })
       .sort({ createdAt: -1 })
-      .populate('shopId', 'businessName shopAddress')
+      .populate('shopId', 'businessName shopAddress shopPhone')
       .limit(50);
     res.json({ success: true, data: orders });
+  } catch (err) {
+    console.error('GET /orders/mine error:', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── GET /api/orders/debug — shows last 20 orders (any user) for debugging ────
+// Remove this route after confirming orders work correctly in production
+router.get('/debug', auth, async (req, res) => {
+  try {
+    const orders = await Order.find({})
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .select('shopId consumerId consumerName status total createdAt');
+    res.json({
+      success: true,
+      yourUserId: req.user.id,
+      yourRole: req.user.role,
+      totalOrdersInDB: await Order.countDocuments({}),
+      ordersForYourShop: await Order.countDocuments({ shopId: toId(req.user.id) }),
+      last20Orders: orders,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -39,7 +67,7 @@ router.post('/', auth, async (req, res) => {
 
     // Cast shopId to ObjectId so Mongoose comparison is reliable
     let shopObjId;
-    try { shopObjId = new mongoose.Types.ObjectId(shopId); }
+    try { shopObjId = toId(shopId); }
     catch { return res.status(400).json({ success: false, message: 'Invalid shop ID.' }); }
 
     // Validate products belong to that shop (skip inStock — trust the UI)
@@ -47,7 +75,7 @@ router.post('/', auth, async (req, res) => {
     const enrichedItems = [];
     for (const item of items) {
       let prodId;
-      try { prodId = new mongoose.Types.ObjectId(item.productId); }
+      try { prodId = toId(item.productId); }
       catch { return res.status(400).json({ success: false, message: `Invalid product ID for ${item.name}.` }); }
 
       const product = await Product.findOne({ _id: prodId, userId: shopObjId });
@@ -67,7 +95,7 @@ router.post('/', auth, async (req, res) => {
 
     const order = await Order.create({
       shopId:        shopObjId,
-      consumerId:    new mongoose.Types.ObjectId(req.user.id),
+      consumerId:    toId(req.user.id),
       consumerName:  req.user.name,
       consumerPhone: consumerPhone || '',
       items:         enrichedItems,
@@ -90,7 +118,7 @@ router.patch('/:id/status', auth, async (req, res) => {
     if (!valid.includes(status)) return res.status(400).json({ success: false, message: 'Invalid status.' });
 
     const order = await Order.findOneAndUpdate(
-      { _id: req.params.id, shopId: req.user.id },
+      { _id: toId(req.params.id), shopId: toId(req.user.id) },
       { status, updatedAt: new Date() },
       { new: true }
     );
@@ -104,13 +132,14 @@ router.patch('/:id/status', auth, async (req, res) => {
 // ── GET /api/orders/stats — seller order stats for dashboard ─────────────────
 router.get('/stats', auth, async (req, res) => {
   try {
+    const sellerId = toId(req.user.id);
     const [total, pending, ready] = await Promise.all([
-      Order.countDocuments({ shopId: req.user.id }),
-      Order.countDocuments({ shopId: req.user.id, status: 'pending' }),
-      Order.countDocuments({ shopId: req.user.id, status: 'ready' }),
+      Order.countDocuments({ shopId: sellerId }),
+      Order.countDocuments({ shopId: sellerId, status: 'pending' }),
+      Order.countDocuments({ shopId: sellerId, status: 'ready' }),
     ]);
     const revenue = await Order.aggregate([
-      { $match: { shopId: req.user._id || req.user.id, status: 'completed' } },
+      { $match: { shopId: sellerId, status: 'completed' } },
       { $group: { _id: null, total: { $sum: '$total' } } },
     ]);
     res.json({ success: true, data: { total, pending, ready, completedRevenue: revenue[0]?.total || 0 } });
