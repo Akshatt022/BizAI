@@ -121,6 +121,18 @@ export default function Login() {
             Create one
           </Link>
         </p>
+        <p className="flex flex-col justify-center align-middle mt-6 text-sm" style={{ color: 'var(--txt-2)' }}>
+          <div className="text-center mb-2 font-semibold" style={{ color: 'var(--accent-2)' }}>
+            LOGIN CREDENCIAL FOR SELLER  <br />
+          test@gmail.com 
+          Test@1234</div>
+          <div className="text-center mb-2 font-semibold" style={{ color: 'var(--accent-2)' }}>
+          LOGIN CREDENCIAL FOR CUSTOMER<br />
+          test@customer.com
+          Test@1234</div>
+          
+          
+        </p>
       </div>
     </div>
   );
